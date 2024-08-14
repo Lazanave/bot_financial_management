@@ -2,9 +2,14 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+
 from config_data.config import Config, load_config
-from handlers import user
+from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.redis import RedisStorage, Redis
+from handlers import admin, user, general
+from middlewares.db import DatabaseMiddleware
+from database.database import async_session_factory
 
 
 # Функция конфигурирования и запуска бота
@@ -28,11 +33,17 @@ async def main() -> None:
     storage = RedisStorage(redis=r)
 
     # Инициализируем бот и диспетчер
-    bot = Bot(token=config.tg_bot.token)
+    bot = Bot(token=config.tg_bot.token,
+              default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=storage)
 
     # Регистриуем роутеры в диспетчере
+    dp.include_router(admin.router)
     dp.include_router(user.router)
+    dp.include_router(general.router)
+
+    # Подключаем миддлваре
+    dp.update.middleware(DatabaseMiddleware(session=async_session_factory))
 
     # Пропускаем накопившиеся апдейты и запускаем polling
     logger.info('Starting bot...')
